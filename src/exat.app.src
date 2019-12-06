@@ -1,5 +1,5 @@
 {application, exat,
- [{description, "An escript"},
+ [{description, "Elixir Module and Struct Interoperability for Erlang"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications,
@@ -10,5 +10,5 @@
   {modules, []},
 
   {licenses, ["Apache 2.0"]},
-  {links, []}
+  {links, [{"Github", "https://github.com/marianoguerra/exat"}]}
  ]}.
