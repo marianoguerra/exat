@@ -85,6 +85,44 @@ Into this:
     'Elixir.Learn.User':'__struct__'(#{name => "bob", age => 42})
 ```
 
+## Pattern Matching Structs
+
+Function calls are not allowed in pattern match positions, for example
+on function/case/etc clauses or the left side of a `=`, for that there's a
+different syntax:
+
+```erlang
+get_name({ex@struct_alias, #{name := Name}}) ->
+    Name;
+get_name({ex@struct_alias, #{}}) ->
+    {error, no_name}.
+```
+
+Becomes:
+
+```erlang
+get_name(#{'__struct__' := 'Elixir.Learn.User',
+           name := Name}) ->
+    Name;
+get_name(#{'__struct__' := 'Elixir.Learn.User'}) ->
+    {error, no_name}.
+```
+
+And:
+
+```erlang
+{ex@struct_alias, #{name := _}} = ex:s@Learn_User(#{name => "bob", age => 42})
+```
+
+Becomes:
+
+```erlang
+#{'__struct__' := 'Elixir.Learn.User', name := _} =
+	'Elixir.Learn.User':'__struct__'(#{name => "bob", age => 42})
+```
+
+This is because that pattern will match maps that also have other keys.
+
 ### Note on Static Compilation of Literal Structs
 
 On Elixir if you pass the fields to the struct it will be compiled to a map

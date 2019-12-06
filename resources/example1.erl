@@ -14,8 +14,8 @@ main() ->
     get_name(S).
 
 create_struct(MapVar) ->
-    ex:s@Learn_User(MapVar),
-    ex:s@Learn_User(#{name => "bob", age => 42}),
+    {ex@struct_alias, #{name := _}} = ex:s@Learn_User(MapVar),
+    {ex@struct_alias, #{name := _}} = ex:s@Learn_User(#{name => "bob", age => 42}),
     ex:s@struct_alias(#{name => "bob", age => 42}).
 
 get_name({ex@struct_alias, #{name := Name}}) ->
