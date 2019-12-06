@@ -31,13 +31,7 @@ walker(State=#{aliases := CurAliases}, {attribute, Line, ex@alias, AliasMap})
     FinalAliases = maps:merge(CurAliases, NewValidAliases),
     NewState = State#{aliases := FinalAliases},
     {ignore, NewState};
-walker(State, Ast={atom, AtomLine, FunName}) ->
-    case atom_to_list(FunName) of
-        "ex@" ++ RestName ->
-            rest_atom_to_ast(State, AtomLine, RestName);
-        _ ->
-            {Ast, State}
-    end;
+
 % similar to next until TODO of static compilation to map is solved
 walker(State, Ast={call, L1, {remote, L2, {atom, L3, ex}, {atom, L4, FnName}},
                [FieldsAst={map, _L5, _Fields}]}) ->
@@ -72,13 +66,33 @@ walker(State, Ast={call, L1, {remote, L2, {atom, L3, ex}, {atom, L4, FnName}},
             {Ast, State}
     end;
 
+% ex@Mod:fun(...) (or foo:bar(...) checking if foo is a bare alias)
 walker(State=#{aliases := Aliases},
-       {call, CLine, {remote, Line, {atom, ModLine, ModAtom}, FunName}, Args}) ->
-    MaybeNewModName = maps:get(ModAtom, Aliases, ModAtom),
-    NewAst = {call, CLine,
-              {remote, Line, {atom, ModLine, MaybeNewModName}, FunName}, Args},
-    {NewAst, State};
+       {call, L1, {remote, L2, {atom, AtomLine, ModName}, FnIdAst}, Args}) ->
+    case atom_to_list(ModName) of
+        "ex@" ++ RestName ->
+            {NewModNameAst, State1} = rest_atom_to_ast(State, AtomLine, RestName),
+			NewAst = {call, L1, {remote, L2, NewModNameAst, FnIdAst}, Args},
+            {NewAst, State1};
+        _ ->
+            MaybeNewModName = maps:get(ModName, Aliases, ModName),
+            NewAst = {call, L1,
+                      {remote, L2, {atom, AtomLine, MaybeNewModName}, FnIdAst},
+                      Args},
+            {NewAst, State}
+    end;
 
+walker(State, Ast={tuple, L1, [{atom, _L2, AtomName}, {map, _L3, MapFields}]}) ->
+    case atom_to_list(AtomName) of
+        "ex@" ++ RestName ->
+            {StructAtomAst, State1} = rest_atom_to_ast(State, L1, RestName),
+            MatchStructAttrAst = {map_field_exact, L1,
+                                  {atom, L1, '__struct__'}, StructAtomAst},
+			NewAst = {map, L1, [MatchStructAttrAst | MapFields]},
+			{NewAst, State1};
+        _ ->
+            {Ast, State}
+    end;
 
 walker(State, Other) ->
     {Other, State}.
