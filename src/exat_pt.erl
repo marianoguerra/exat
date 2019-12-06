@@ -34,19 +34,51 @@ walker(State=#{aliases := CurAliases}, {attribute, Line, ex@alias, AliasMap})
 walker(State, Ast={atom, AtomLine, FunName}) ->
     case atom_to_list(FunName) of
         "ex@" ++ RestName ->
-            #{aliases := Aliases} = State,
-            ExAtomBase = to_ex_atom(RestName),
-            ExAtom = maps:get(ExAtomBase, Aliases, ExAtomBase),
-            {{atom, AtomLine, ExAtom}, State};
+            rest_atom_to_ast(State, AtomLine, RestName);
         _ ->
             {Ast, State}
     end;
+% similar to next until TODO of static compilation to map is solved
+walker(State, Ast={call, L1, {remote, L2, {atom, L3, ex}, {atom, L4, FnName}},
+               [FieldsAst={map, _L5, _Fields}]}) ->
+    case atom_to_list(FnName) of
+        "s@" ++ RestName ->
+            {StructModAtomAst, State1} = rest_atom_to_ast(State, L3, RestName),
+            % TODO: if we can call 'Elixir.Struct.Id':__struct__()
+            % at compile time we can compile it diretly into a map with the
+            % '__struct__' key like elixir does (faster)
+            % 'Elixir.Struct.Id':__struct__(#{...})
+            NewAst = {call, L1,
+                      {remote, L2, StructModAtomAst, {atom, L4, '__struct__'}},
+                      [FieldsAst]},
+            {NewAst, State1};
+        _ ->
+            % TODO: warning?
+            {Ast, State}
+    end;
+
+% here it's not an explicit map we call mod:__struct__/1
+walker(State, Ast={call, L1, {remote, L2, {atom, L3, ex}, {atom, L4, FnName}},
+               Args}) ->
+    case atom_to_list(FnName) of
+        "s@" ++ RestName ->
+            {StructModAtomAst, State1} = rest_atom_to_ast(State, L3, RestName),
+            NewAst = {call, L1,
+                      {remote, L2, StructModAtomAst, {atom, L4, '__struct__'}},
+                      Args},
+            {NewAst, State1};
+        _ ->
+            % TODO: warning?
+            {Ast, State}
+    end;
+
 walker(State=#{aliases := Aliases},
        {call, CLine, {remote, Line, {atom, ModLine, ModAtom}, FunName}, Args}) ->
     MaybeNewModName = maps:get(ModAtom, Aliases, ModAtom),
     NewAst = {call, CLine,
               {remote, Line, {atom, ModLine, MaybeNewModName}, FunName}, Args},
     {NewAst, State};
+
 
 walker(State, Other) ->
     {Other, State}.
@@ -75,3 +107,9 @@ add_warning(State=#{warnings := Warns}, Type, Info) ->
 report_problems(#{warnings := []}) -> ok;
 report_problems(#{warnings := Warns}) ->
     [io:format(Warn) || Warn <- Warns].
+
+rest_atom_to_ast(State, Line, RestName) ->
+    #{aliases := Aliases} = State,
+    ExAtomBase = to_ex_atom(RestName),
+    ExAtom = maps:get(ExAtomBase, Aliases, ExAtomBase),
+    {{atom, Line, ExAtom}, State}.
